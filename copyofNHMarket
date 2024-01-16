@@ -1,0 +1,190 @@
+/*
+cleaning data in SQL queries
+*/
+
+select *
+from PortfolioProject2.dbo.NashvilleHousing;
+
+
+-- Standardize date format 
+
+-- We see hour, minute and second in the date column which are not useful. So, we would want to remove that part.
+
+select
+	SaleDate, 
+	CONVERT(date,SaleDate)
+from PortfolioProject2.dbo.NashvilleHousing
+
+-- first method 
+
+Update NashvilleHousing
+Set SaleDate=CONVERT(date,SaleDate)
+
+--second method 
+Alter Table NashvilleHousing
+Add SalesDateConverted Date;
+
+Update NashvilleHousing
+Set SalesDateConverted=CONVERT(date,SaleDate); 
+
+select 
+	SalesDateConverted
+from PortfolioProject2.dbo.NashvilleHousing;
+
+--Next step is to populate property address data 
+
+/* We have noticed that some property addresses are null, but not sure why. What we can do to fix that problem 8
+is to use the address associated with similar ParcellD and populate null valued because we can see that those ids
+use the same address.*/
+
+select *
+from PortfolioProject2.dbo.NashvilleHousing
+--where PropertyAddress is null;
+order by ParcelID;
+
+/* we need to join the table with itself to proceed*/
+
+select 
+	a.parcelid, 
+	a.PropertyAddress,
+	b.parcelid, 
+	b.propertyaddress,
+	isnull(a.PropertyAddress,b.propertyaddress)
+from PortfolioProject2.dbo.NashvilleHousing a
+join PortfolioProject2.dbo.NashvilleHousing b
+	on a.ParcelID=b.ParcelID
+	and a.[UniqueID ]<>b.[UniqueID ]
+where a.PropertyAddress is null;
+
+/* The above query shows that a.propertyaddress null cells should have the same address as b.propertyaddress. So, we should 
+use a function isnull to replace null values with the same address from b.propertyaddress as done in the above.*/
+
+update a
+set a.PropertyAddress=isnull(a.PropertyAddress,b.propertyaddress)
+from PortfolioProject2.dbo.NashvilleHousing a
+join PortfolioProject2.dbo.NashvilleHousing b
+on a.ParcelID=b.ParcelID
+	and a.[UniqueID ]<>b.[UniqueID ]
+where a.PropertyAddress is null;
+
+--Next, we want to break the address column into individual columns i.e. Address, City, State
+--Charindex is used to break propertyaddress by comma(or anything else you would want to separate it by)
+/*Charindex counts the number of character that comma is away from the first character. So, it will keep the comma
+unless we subtract the charindex by one as shown in the following query.*/
+
+select 
+	SUBSTRING(propertyaddress, 1, CHARINDEX(',',propertyaddress)-1) as address,
+	SUBSTRING(propertyaddress, CHARINDEX(',',propertyaddress)+1,LEN(propertyaddress))
+from PortfolioProject2.dbo.NashvilleHousing 
+
+
+Alter Table NashvilleHousing
+Add PropertySplitAddress nvarchar(255);
+
+Update NashvilleHousing
+Set PropertySplitAddress=SUBSTRING(propertyaddress, 1, CHARINDEX(',',propertyaddress)-1); 
+
+Alter Table NashvilleHousing
+Add PropertySplitCity nvarchar(255);
+
+Update NashvilleHousing
+Set PropertySplitCity=SUBSTRING(propertyaddress, CHARINDEX(',',propertyaddress)+1,LEN(propertyaddress)); 
+
+select *
+from PortfolioProject2.dbo.NashvilleHousing 
+
+/* what we did above would make querying the table easier down the road.*/
+
+-- Now, let us take a peek at a second way of delimiting PropertyAddress by using a combination of Parsename and replace 
+
+select 
+	PARSENAME(REPLACE(OwnerAddress,',','.'),3),
+	PARSENAME(REPLACE(OwnerAddress,',','.'),2),
+	PARSENAME(REPLACE(OwnerAddress,',','.'),1)
+from PortfolioProject2.dbo.NashvilleHousing 
+
+Alter Table NashvilleHousing
+Add OwnerSplitAddress nvarchar(255);
+
+Update NashvilleHousing
+Set OwnerSplitAddress=PARSENAME(REPLACE(OwnerAddress,',','.'),3);
+
+Alter Table NashvilleHousing
+Add OwnerSplitCity nvarchar(255);
+
+Update NashvilleHousing
+Set OwnerSplitCity=PARSENAME(REPLACE(OwnerAddress,',','.'),2);
+
+Alter Table NashvilleHousing
+Add OwnerSplitState nvarchar(255);
+
+Update NashvilleHousing
+Set OwnerSplitState=PARSENAME(REPLACE(OwnerAddress,',','.'),1);
+
+-- I noticed that I had accidentally added a column called SalesDateCleaned. So, I am going to drop it.
+
+alter table PortfolioProject2.dbo.NashvilleHousing 
+drop column SalesDateCleaned
+
+select *
+from PortfolioProject2.dbo.NashvilleHousing 
+
+-- Next, we are going to replace Y and N in Sold As Vacant to Yes and No. 
+
+select 
+	distinct(SoldAsVacant), 
+	COUNT(SoldAsVacant)
+from PortfolioProject2.dbo.NashvilleHousing 
+group by SoldAsVacant
+order by 2;
+
+select 
+	SoldAsVacant, 
+	case when SoldAsVacant='Y' then 'Yes'
+		 when SoldAsVacant='N' then 'No'
+		 else SoldAsVacant
+	end 
+from PortfolioProject2.dbo.NashvilleHousing 
+
+update NashvilleHousing
+set SoldAsVacant = case when SoldAsVacant='Y' then 'Yes'
+		 when SoldAsVacant='N' then 'No'
+		 else SoldAsVacant
+	end 
+
+--Next, we are going to remove duplicates 
+--Row_number function helps us to identify if there is/are duplicates
+--We can then create a CTE and choose row_num to see how many rows are being repeated
+
+With Rownumb_CTE as (
+Select 
+	*, 
+	ROW_NUMBER() Over (
+	Partition by Parcelid, 
+				  PropertyAddress, 
+				  SalePrice, 
+				  SaleDate, 
+				  legalreference 
+				  order by 
+					uniqueid
+					) row_num
+from PortfolioProject2.dbo.NashvilleHousing 
+--order by ParcelID
+)
+
+select *
+--from Rownumb_CTE
+
+--delete 
+from Rownumb_CTE
+where row_num>1
+order by propertyaddress;
+
+
+select *
+from PortfolioProject2.dbo.NashvilleHousing 
+
+alter table PortfolioProject2.dbo.NashvilleHousing 
+drop column SaleDate, PropertyAddress, TaxDistrict, OwnerAddress
+
+--The final table look by far better because we can now use columns easier to query more and explore more things with our data. 
