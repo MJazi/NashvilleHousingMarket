@@ -1,0 +1,34 @@
+Overview
+This SQL script is designed to clean and standardize the data in the NashvilleHousing table from the PortfolioProject2 database. 
+The cleaning process involves standardizing date formats, populating missing addresses, splitting address columns, replacing values in a column,
+removing duplicates, and restructuring the table for easier querying.
+
+Steps
+1. Viewing the Data
+The script starts by selecting all columns from the NashvilleHousing table to examine the data.
+
+2. Standardizing Date Format
+The script converts the SaleDate column to the standard date format by removing unnecessary time information.
+
+3. Populating Property Address Data
+The script populates missing PropertyAddress values by using the ParcelID to match records with similar IDs and fill in the missing addresses.
+
+4. Splitting the PropertyAddress Column
+The PropertyAddress column is split into separate columns: PropertySplitAddress and PropertySplitCity for easier querying.
+
+5. Splitting the OwnerAddress Column
+The OwnerAddress column is also split into OwnerSplitAddress, OwnerSplitCity, and OwnerSplitState using a combination of PARSENAME and REPLACE functions.
+
+6. Replacing Values in SoldAsVacant
+The script standardizes the SoldAsVacant column by replacing 'Y' with 'Yes' and 'N' with 'No'.
+
+7. Removing Duplicates
+The script removes duplicate rows by using the ROW_NUMBER() function to identify duplicates based on specific columns (ParcelID, PropertyAddress, 
+SalePrice, SaleDate, legalreference) and then deleting them.
+
+8. Dropping Unnecessary Columns
+Finally, the script drops unnecessary columns (SaleDate, PropertyAddress, TaxDistrict, OwnerAddress) from the table to simplify it.
+
+Conclusion
+After executing the script, the NashvilleHousing table is cleaned and structured for more efficient querying and data analysis. 
+The final table is streamlined, with standardized dates, complete addresses, and no duplicates, making it easier to perform further data analysis.
